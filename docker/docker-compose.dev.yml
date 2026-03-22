@@ -13,6 +13,7 @@ services:
       PROXY_LOG_JSON: "false"
       PROXY_API_KEY: "dev-api-key-change-me"
       PROXY_SSRF_ALLOW_PRIVATE: "true"
+      PROXY_MAX_BODY_BYTES: "104857600"
       PROXY_WS_SANITIZE_PATHS: '["/ws/conversations/"]'
     depends_on:
       redis:

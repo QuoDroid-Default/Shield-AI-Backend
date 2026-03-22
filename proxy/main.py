@@ -266,6 +266,14 @@ async def proxy_request(request: Request, path: str) -> Response:
     if context.user_id:
         headers["x-user-id"] = context.user_id
 
+    # Inject X-Forwarded-* headers for upstream to know the original request context
+    if context.extra.get("x_forwarded_for"):
+        headers["x-forwarded-for"] = context.extra["x_forwarded_for"]
+    if context.extra.get("x_forwarded_proto"):
+        headers["x-forwarded-proto"] = context.extra["x_forwarded_proto"]
+    if context.extra.get("x_forwarded_host"):
+        headers["x-forwarded-host"] = context.extra["x_forwarded_host"]
+
     # Read request body with size limit
     content_length = request.headers.get("content-length")
     if content_length:

@@ -18,6 +18,7 @@ _STRIP_HEADERS = frozenset({
     "x-tenant-id",
     "x-user-id",
     "x-request-id",
+    "x-forwarded-host",
 })
 
 _STRIP_PREFIXES = ("x-shieldai-",)
@@ -80,6 +81,9 @@ class ContextInjector(Middleware):
 
         # Set X-Forwarded-Proto
         context.extra["x_forwarded_proto"] = request.url.scheme
+
+        # Set X-Forwarded-Host (original Host header before proxy strips it)
+        context.extra["x_forwarded_host"] = request.headers.get("host", "")
 
         logger.debug(
             "context_injected",
