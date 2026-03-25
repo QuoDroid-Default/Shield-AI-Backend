@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import json
 import os
 from pathlib import Path
 from typing import Any
@@ -18,6 +19,16 @@ _pool = None
 # Whitelisted column names for dynamic UPDATE statements
 _CUSTOMER_COLUMNS = frozenset({"name", "plan", "settings"})
 _APP_COLUMNS = frozenset({"name", "origin_url", "domain", "enabled_features", "settings"})
+_JSONB_COLUMNS = frozenset({"settings", "enabled_features"})
+
+
+def _jsonb_value(val: Any) -> str | Any:
+    """Serialize a value for asyncpg JSONB parameter."""
+    if isinstance(val, str):
+        return val
+    if isinstance(val, (dict, list)):
+        return json.dumps(val)
+    return val
 
 # PBKDF2 parameters for API key hashing
 _PBKDF2_ITERATIONS = 260_000
@@ -120,7 +131,7 @@ async def create_customer(name: str, plan: str, api_key: str, settings: dict) ->
             """INSERT INTO customers (name, plan, api_key_hash, settings)
                VALUES ($1, $2, $3, $4::jsonb)
                RETURNING id, name, plan, settings, created_at, updated_at""",
-            name, plan, key_hash, settings,
+            name, plan, key_hash, json.dumps(settings),
         )
         return dict(row) if row else None
 
@@ -148,8 +159,12 @@ async def update_customer(customer_id: UUID, **fields) -> dict[str, Any] | None:
         if val is not None:
             if key not in _CUSTOMER_COLUMNS:
                 raise ValueError(f"Invalid column name: {key}")
-            set_clauses.append(f"{key} = ${idx}")
-            values.append(val)
+            if key in _JSONB_COLUMNS:
+                set_clauses.append(f"{key} = ${idx}::jsonb")
+                values.append(_jsonb_value(val))
+            else:
+                set_clauses.append(f"{key} = ${idx}")
+                values.append(val)
             idx += 1
     if not set_clauses:
         return await get_customer(customer_id)
@@ -182,7 +197,7 @@ async def create_app(customer_id: UUID, name: str, origin_url: str, domain: str,
             """INSERT INTO apps (customer_id, name, origin_url, domain, enabled_features, settings)
                VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb)
                RETURNING id, customer_id, name, origin_url, domain, enabled_features, settings, created_at, updated_at""",
-            customer_id, name, origin_url, domain, enabled_features, settings,
+            customer_id, name, origin_url, domain, json.dumps(enabled_features), json.dumps(settings),
         )
         return dict(row) if row else None
 
@@ -231,8 +246,12 @@ async def update_app(app_id: UUID, *, customer_id: UUID | None = None, **fields)
         if val is not None:
             if key not in _APP_COLUMNS:
                 raise ValueError(f"Invalid column name: {key}")
-            set_clauses.append(f"{key} = ${idx}")
-            values.append(val)
+            if key in _JSONB_COLUMNS:
+                set_clauses.append(f"{key} = ${idx}::jsonb")
+                values.append(_jsonb_value(val))
+            else:
+                set_clauses.append(f"{key} = ${idx}")
+                values.append(val)
             idx += 1
     if not set_clauses:
         return await get_app(app_id, customer_id=customer_id)

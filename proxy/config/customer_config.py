@@ -10,6 +10,7 @@ from typing import Any
 
 import structlog
 
+from proxy.config.loader import get_settings
 from proxy.store import postgres as pg_store
 
 logger = structlog.get_logger()
@@ -70,6 +71,15 @@ class CustomerConfigService:
         self._cache_time = time.monotonic()
         logger.info("customer_config_loaded", domains=len(new_cache))
 
+    def _get_default_config(self) -> dict[str, Any]:
+        """Build default config using PROXY_UPSTREAM_URL from settings."""
+        settings = get_settings()
+        return {
+            "origin_url": settings.upstream_url,
+            "enabled_features": dict(_DEFAULT_CONFIG["enabled_features"]),
+            "settings": dict(_DEFAULT_CONFIG["settings"]),
+        }
+
     def get_config(self, domain: str) -> dict[str, Any]:
         """Return config for a domain, or default config if not found."""
         config = self._cache.get(domain)
@@ -79,7 +89,7 @@ class CustomerConfigService:
         now = time.monotonic()
         neg = self._negative_cache.get(domain)
         if neg and now < neg:
-            return _DEFAULT_CONFIG
+            return self._get_default_config()
         self._negative_cache[domain] = now + _NEGATIVE_CACHE_TTL
         # Evict expired entries when cache exceeds max size
         if len(self._negative_cache) > _NEGATIVE_CACHE_MAX:
@@ -87,7 +97,7 @@ class CustomerConfigService:
                 d: exp for d, exp in self._negative_cache.items() if exp > now
             }
         logger.debug("customer_config_miss", domain=domain)
-        return _DEFAULT_CONFIG
+        return self._get_default_config()
 
     def is_stale(self) -> bool:
         """Check if cache is older than TTL."""

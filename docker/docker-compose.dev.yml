@@ -6,7 +6,7 @@ services:
     ports:
       - "8080:8080"
     environment:
-      PROXY_UPSTREAM_URL: "http://host.docker.internal:8000"
+      PROXY_UPSTREAM_URL: "http://host.docker.internal:80"
       PROXY_REDIS_URL: "redis://redis:6379"
       PROXY_POSTGRES_URL: "postgresql://shieldai:shieldai@postgres:5432/shieldai"
       PROXY_LOG_LEVEL: "debug"

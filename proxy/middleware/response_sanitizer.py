@@ -194,6 +194,20 @@ class ResponseSanitizer(Middleware):
         if not features.get("response_sanitizer", True):
             return response
 
+        # Skip compressed responses — decoding gzip/br as UTF-8 produces
+        # garbage.  Compressed 4xx/5xx responses are rare; the upstream
+        # proxy layer should ideally strip Content-Encoding before we
+        # reach this point.
+        content_encoding = response.headers.get("content-encoding", "").lower()
+        if content_encoding in ("gzip", "br", "deflate", "zstd"):
+            logger.debug(
+                "response_sanitizer_skip_compressed",
+                encoding=content_encoding,
+                status_code=response.status_code,
+                request_id=context.request_id,
+            )
+            return response
+
         # Read response body — guard against StreamingResponse or other
         # response types that lack a .body attribute.  Without this check
         # an attacker who can trigger a streaming error response would

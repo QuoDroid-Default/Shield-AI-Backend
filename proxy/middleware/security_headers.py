@@ -83,8 +83,13 @@ class SecurityHeaders(Middleware):
             if header in response.headers:
                 del response.headers[header]
 
-        # Apply preset headers
+        # Apply preset headers (only if upstream didn't already set them)
         for header_name, header_value in preset.items():
+            # Respect upstream's header — don't override what the app already sets
+            existing = response.headers.get(header_name)
+            if existing:
+                continue
+
             # Handle CSP specially — merge with customer overrides
             if header_name == "content-security-policy":
                 csp_override = customer_settings.get("csp_override", "")

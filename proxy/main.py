@@ -347,10 +347,14 @@ async def proxy_request(request: Request, path: str) -> Response:
     # comma-folded Set-Cookie unparseable).
     response_headers = {}
     set_cookie_headers: list[str] = []
+    # httpx auto-decompresses response bodies, so content-encoding and
+    # content-length from upstream no longer match the actual body bytes.
+    # Strip them to avoid ERR_CONTENT_DECODING_FAILED in the browser.
+    _skip_response_headers = frozenset({"content-encoding", "content-length"})
     for raw_name, raw_value in upstream_resp.headers.raw:
         name = raw_name.decode("latin-1").lower()
         value = raw_value.decode("latin-1")
-        if name in HOP_BY_HOP_HEADERS:
+        if name in HOP_BY_HOP_HEADERS or name in _skip_response_headers:
             continue
         if name == "set-cookie":
             set_cookie_headers.append(value)
