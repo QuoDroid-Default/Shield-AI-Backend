@@ -20,13 +20,11 @@ services:
         condition: service_healthy
       postgres:
         condition: service_healthy
-      mock-upstream:
-        condition: service_started
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
       - ../proxy:/app/proxy
-    restart: unless-stopped
+    restart: always
 
   redis:
     image: redis:7-alpine
@@ -37,6 +35,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 3
+    restart: always
 
   postgres:
     image: postgres:15-alpine
@@ -48,16 +47,13 @@ services:
       POSTGRES_DB: shieldai
     volumes:
       - ../proxy/models/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+      - pgdata:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U shieldai"]
       interval: 10s
       timeout: 5s
       retries: 3
+    restart: always
 
-  mock-upstream:
-    image: python:3.12-slim
-    command: ["python", "/app/mock_upstream.py"]
-    volumes:
-      - ./mock_upstream.py:/app/mock_upstream.py:ro
-    ports:
-      - "3000:3000"
+volumes:
+  pgdata:
